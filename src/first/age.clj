@@ -3,13 +3,21 @@
             [clj-time.core :as t]
             [clj-time.format :as f]))
 
-(defn- extract-number-before-word
-  "Returns [number string-without-that-number] or [0 unaltered-string]"
-  [word string]
+(def number-pattern "(?:^|\\D)(\\d+)(?:\\s*)")
 
-  (if-let [[match number] (re-find (re-pattern (str "(?:^|\\D)(\\d+)(?:\\s*)" word)) string)]
-    [(Integer/parseInt number) (s/replace-first string match "")]
-    [0 string]))
+(defn- extract-number-before-word
+  [string word]
+
+  (if-let [[_ number] (re-find (re-pattern (str number-pattern word)) string)]
+    (Integer/parseInt number)
+    0))
+
+(defn- remove-number-word
+  [string word]
+
+  (if-let [[match _] (re-find (re-pattern (str number-pattern word)) string)]
+    (s/replace-first string match "")
+    string))
 
 (defn- not-blank?
   [s]
@@ -20,14 +28,10 @@
    Returns the age as [years months days],
    or false if invalid."
   [age-string]
-  (let [[age-int leftover-string] (reduce
-                                    (fn [[vnums string] word]
-                                      (let [[num new-string] (extract-number-before-word word string)]
-                                        [(conj vnums num) new-string]))
-                                    [[] age-string]
-                                    ["year" "month" "day"])]
-
-    (if (not-blank? leftover-string) false age-int)))
+  (let [age-units ["year" "month" "day"]]
+    (if (not-blank? (reduce remove-number-word age-string age-units))
+      false
+      (mapv #(extract-number-before-word age-string %) age-units))))
 
 (defn valid-age? [s]
   (if (parse-age s) true false))
